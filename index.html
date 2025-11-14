@@ -75,7 +75,7 @@
           </div>
         </div>
       </div>
-      <template v-if="labelData && !visualEditorMode">
+      <template v-if="labelData && !visualEditorMode" key="labels-view">
         <div class="page-outer" v-for="(page, pageIndex) in arrangeLabels(labelData, template, blanks)">
           <div class="labelpage" :class="'page-' + template.id">
             <template v-for="(label, index) in page">
@@ -99,7 +99,11 @@
         </div>
       </template>
       <!-- Visual Editor Popup -->
-      <div v-if="visualEditorMode" class="editor-popup-overlay" @click="closeEditor()">
+      <div v-if="visualEditorMode" 
+           v-show="visualEditorMode"
+           class="editor-popup-overlay" 
+           @click="closeEditor()"
+           key="editor-popup">
         <div class="editor-popup" @click.stop>
           <div class="editor-popup-header">
             <h3>Label Designer</h3>

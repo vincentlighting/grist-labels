@@ -500,6 +500,8 @@ ready(function() {
       toggleVisualEditor() {
         this.visualEditorMode = !this.visualEditorMode;
         this.selectedField = null;
+        // Force Vue to update
+        this.$forceUpdate();
         if (this.visualEditorMode) {
           this.save();
         }
@@ -516,6 +518,27 @@ ready(function() {
       getEditorFields() {
         // Return fields based on columnConfig for the editor (using column names as placeholders)
         if (!this.columnConfig || this.columnConfig.length === 0) {
+          // If no config yet, try to get from available columns
+          if (this.rows && this.rows.length > 0) {
+            const allColumns = Object.keys(this.rows[0]);
+            const availableColumns = allColumns.filter(col => 
+              col !== 'LabelCount' && 
+              col !== 'id' && 
+              col !== 'manualSort' &&
+              !col.startsWith('_')
+            );
+            return availableColumns.map((col, idx) => ({
+              name: col,
+              columnId: col,
+              position: { x: 5, y: 5 + (idx * 15) },
+              formatting: {
+                fontSize: this.fontSize || 11,
+                color: this.fontColor || '#000000',
+                align: 'left',
+                fontWeight: 'normal'
+              }
+            }));
+          }
           return [];
         }
         return this.columnConfig.map(col => ({

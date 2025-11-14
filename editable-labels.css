@@ -331,27 +331,29 @@ body {
 }
 /* Editor Popup */
 .editor-popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 2000;
-  display: flex;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  z-index: 9999 !important;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   padding: 20px;
 }
 .editor-popup {
-  background-color: white;
+  background-color: white !important;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   max-width: 90vw;
   max-height: 90vh;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   overflow: hidden;
+  z-index: 10000 !important;
+  position: relative;
 }
 .editor-popup-header {
   padding: 16px 20px;
