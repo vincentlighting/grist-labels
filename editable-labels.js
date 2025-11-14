@@ -99,7 +99,12 @@ function handleError(err) {
   console.error('ERROR', err);
   const target = app || data;
   target.labelData = null;
-  target.status = String(err).replace(/^Error: /, '');
+  const errorMsg = err instanceof Error ? err.message : String(err);
+  target.status = errorMsg.replace(/^Error: /, '');
+  // Make sure status is visible
+  if (target.status && target.status !== 'waiting') {
+    console.error('Widget error:', target.status);
+  }
 }
 
 function formatField(field) {
@@ -153,24 +158,50 @@ function updateRecords() {
     }
     
     // Initialize or update column configuration
-    if (data.columnConfig.length === 0) {
+    // Check if we have a valid saved config
+    const hasSavedConfig = data.columnConfig && Array.isArray(data.columnConfig) && data.columnConfig.length > 0;
+    
+    if (!hasSavedConfig) {
       // First time: initialize with all columns visible
       data.columnConfig = availableColumns.map(col => ({
         name: col,
         visible: true
       }));
     } else {
-      // Update: add new columns, remove deleted ones, preserve order
+      // Ensure columnConfig is properly structured first
+      data.columnConfig = data.columnConfig.map(col => {
+        if (typeof col === 'string') {
+          // Handle case where config was saved as just strings
+          return { name: col, visible: true };
+        }
+        return {
+          name: col.name,
+          visible: col.visible !== undefined ? col.visible : true
+        };
+      });
+      
+      // Update: add new columns, remove deleted ones, preserve order and visibility
       const existingNames = new Set(data.columnConfig.map(c => c.name));
       const newColumns = availableColumns.filter(col => !existingNames.has(col));
       
-      // Add new columns at the end
+      // Add new columns at the end (visible by default)
       newColumns.forEach(col => {
         data.columnConfig.push({ name: col, visible: true });
       });
       
       // Remove columns that no longer exist
       data.columnConfig = data.columnConfig.filter(c => availableColumns.includes(c.name));
+      
+      // Ensure all current columns are in the config (in case config was corrupted)
+      availableColumns.forEach(col => {
+        if (!existingNames.has(col)) {
+          // Already added above, but double-check
+          const exists = data.columnConfig.some(c => c.name === col);
+          if (!exists) {
+            data.columnConfig.push({ name: col, visible: true });
+          }
+        }
+      });
     }
     
     // Get visible columns in configured order
@@ -228,8 +259,14 @@ function updateRecords() {
       }
     }
     data.labelData = labelData;
+    // Clear any previous error status
+    if (data.status && data.status !== 'waiting') {
+      data.status = '';
+    }
   } catch (err) {
     handleError(err);
+    // Ensure we don't have invalid data
+    data.labelData = null;
   }
 }
 
@@ -272,7 +309,7 @@ ready(function() {
       data.separator = options.separator || ', ';
       data.showFieldNames = options.showFieldNames || false;
       // Load column configuration if saved
-      if (options.columnConfig && Array.isArray(options.columnConfig)) {
+      if (options.columnConfig && Array.isArray(options.columnConfig) && options.columnConfig.length > 0) {
         data.columnConfig = options.columnConfig;
       }
     } else {
@@ -286,6 +323,10 @@ ready(function() {
       data.separator = ', ';
       data.showFieldNames = false;
       data.columnConfig = [];
+    }
+    // If we have rows, update records to apply column config
+    if (data.rows) {
+      updateRecords();
     }
   })
   
@@ -315,15 +356,6 @@ ready(function() {
     watch : {
       rows() {
         updateRecords();
-      },
-      columnConfig: {
-        handler() {
-          // Update labels when column configuration changes
-          if (this.rows) {
-            updateRecords();
-          }
-        },
-        deep: true
       }
     },
     methods: {
@@ -347,16 +379,25 @@ ready(function() {
           marginBottom: this.separator ? '0' : '0.2em'
         };
       },
+      onColumnVisibilityChange() {
+        // Save configuration and update labels
+        this.save().then(() => {
+          if (this.rows) {
+            updateRecords();
+          }
+        });
+      },
       moveColumn(index, direction) {
         const newIndex = index + direction;
         if (newIndex >= 0 && newIndex < this.columnConfig.length) {
           const item = this.columnConfig.splice(index, 1)[0];
           this.columnConfig.splice(newIndex, 0, item);
-          this.save();
-          // Trigger update to refresh labels
-          if (this.rows) {
-            updateRecords();
-          }
+          this.save().then(() => {
+            // Trigger update to refresh labels after save
+            if (this.rows) {
+              updateRecords();
+            }
+          });
         }
       },
       async save() {
