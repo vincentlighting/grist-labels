@@ -41,6 +41,10 @@
             <input type="number" id="fontsize" v-model="fontSize" @change="save()" min="8" max="24" step="0.5">
           </div>
           <div class="option-row">
+            <label>Font color:</label>
+            <input type="color" id="fontcolor" v-model="fontColor" @change="save()">
+          </div>
+          <div class="option-row">
             <label>Text alignment:</label>
             <select id="textalign" v-model="textAlign" @change="save()">
               <option value="left">Left</option>
@@ -68,10 +72,6 @@
             <template v-for="(label, index) in page">
               <div class="label" :class="'label-' + template.id" v-if="label !== null">
                 <div class="label-content" 
-                     :contenteditable="true"
-                     @blur="updateLabel(label, $event)"
-                     @keydown.enter.prevent="updateLabel(label, $event)"
-                     @focus="storeOriginalText(label, $event)"
                      :style="labelStyle"
                      :data-label-id="label.rowId + '-' + index">{{ getLabelText(label) }}</div>
               </div>

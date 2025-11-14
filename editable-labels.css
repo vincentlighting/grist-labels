@@ -28,19 +28,6 @@ body {
   overflow: hidden;
 }
 
-.label-content:focus {
-  background-color: #f0f8ff;
-  border: 1px dashed #4a90e2;
-}
-
-.label-content:not(:focus) {
-  cursor: pointer;
-}
-
-.label-content:hover:not(:focus) {
-  background-color: #f9f9f9;
-}
-
 .field-name {
   font-weight: bold;
   font-size: 0.9em;
@@ -220,6 +207,14 @@ body {
   width: 4em;
   padding: 4px;
 }
+#fontcolor {
+  width: 60px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
 #separator {
   font-size: 11pt;
   width: 6em;
@@ -254,10 +249,6 @@ body {
   .label-content {
     background-color: white !important;
     border: none !important;
-    cursor: default !important;
-  }
-  .label-content:hover {
-    background-color: white !important;
   }
 }
 

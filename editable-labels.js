@@ -54,6 +54,7 @@ let data = {
   rows: null,
   // Formatting options
   fontSize: 11,
+  fontColor: '#000000',
   textAlign: 'left',
   lineSpacing: 1.2,
   separator: ', ',
@@ -186,8 +187,7 @@ function updateRecords() {
         labelData.push({
           fields: fields,
           rowIndex: rowIndex,
-          rowId: r.id,
-          originalText: null  // Store original text for comparison
+          rowId: r.id
         });
         data.rowIndices.push(rowIndex);
       }
@@ -198,86 +198,6 @@ function updateRecords() {
   }
 }
 
-// Update label when edited
-async function updateLabel(label, event) {
-  try {
-    if (!label) return;
-    
-    const newText = (event.target.innerText || event.target.textContent || '').trim();
-    
-    // If nothing changed, don't update
-    if (label.originalText === newText) {
-      return;
-    }
-    
-    // Parse the edited text back into fields
-    const lines = newText.split('\n').filter(line => line.trim());
-    
-    // If field names are shown, parse "FieldName: value" format
-    if (data.showFieldNames) {
-      const updates = {};
-      for (const line of lines) {
-        const match = line.match(/^([^:]+):\s*(.*)$/);
-        if (match) {
-          const fieldName = match[1].trim();
-          const fieldValue = match[2].trim();
-          const field = label.fields.find(f => f.name === fieldName);
-          if (field) {
-            // Convert value back to appropriate type
-            let convertedValue = fieldValue;
-            if (field.type === 'Numeric') {
-              const num = parseFloat(fieldValue);
-              convertedValue = isNaN(num) ? fieldValue : num;
-            } else if (field.type === 'Date') {
-              // Try to parse as date
-              const date = new Date(fieldValue);
-              convertedValue = isNaN(date.getTime()) ? fieldValue : date.toISOString();
-            }
-            updates[field.columnId] = convertedValue;
-          }
-        }
-      }
-      
-      // Update in Grist if we have changes
-      if (Object.keys(updates).length > 0) {
-        await grist.docApi.applyUserActions([['UpdateRecord', label.rowId, updates]]);
-        label.originalText = newText;
-      }
-    } else {
-      // When field names aren't shown, update based on separator or line breaks
-      // If separator is used, split by separator; otherwise use line breaks
-      let values = [];
-      if (data.separator && newText.includes(data.separator)) {
-        values = newText.split(data.separator).map(v => v.trim());
-      } else {
-        values = lines;
-      }
-      
-      const updates = {};
-      label.fields.forEach((field, idx) => {
-        if (idx < values.length) {
-          let convertedValue = values[idx];
-          if (field.type === 'Numeric') {
-            const num = parseFloat(values[idx]);
-            convertedValue = isNaN(num) ? values[idx] : num;
-          } else if (field.type === 'Date') {
-            const date = new Date(values[idx]);
-            convertedValue = isNaN(date.getTime()) ? values[idx] : date.toISOString();
-          }
-          updates[field.columnId] = convertedValue;
-        }
-      });
-      
-      if (Object.keys(updates).length > 0) {
-        await grist.docApi.applyUserActions([['UpdateRecord', label.rowId, updates]]);
-        label.originalText = newText;
-      }
-    }
-  } catch (err) {
-    console.error('Error updating label:', err);
-    handleError(err);
-  }
-}
 
 // Page width before any scaling is applied.
 let pageWidth = null;
@@ -293,7 +213,7 @@ function updateSize() {
 
 ready(function() {
   grist.ready({
-    requiredAccess: 'full',
+    requiredAccess: 'read table',
     columns: [
       {
         name: LabelCount,
@@ -311,6 +231,7 @@ ready(function() {
       data.template = findTemplate(options.template) || defaultTemplate;
       data.blanks = options.blanks || 0;
       data.fontSize = options.fontSize || 11;
+      data.fontColor = options.fontColor || '#000000';
       data.textAlign = options.textAlign || 'left';
       data.lineSpacing = options.lineSpacing || 1.2;
       data.separator = options.separator || ', ';
@@ -320,6 +241,7 @@ ready(function() {
       data.template = defaultTemplate;
       data.blanks = 0;
       data.fontSize = 11;
+      data.fontColor = '#000000';
       data.textAlign = 'left';
       data.lineSpacing = 1.2;
       data.separator = ', ';
@@ -344,6 +266,7 @@ ready(function() {
       labelStyle() {
         return {
           fontSize: this.fontSize + 'pt',
+          color: this.fontColor,
           textAlign: this.textAlign,
           lineHeight: this.lineSpacing
         };
@@ -352,24 +275,6 @@ ready(function() {
     watch : {
       rows() {
         updateRecords();
-      },
-      labelData() {
-        // Update contenteditable elements after data changes
-        this.$nextTick(() => {
-          const editableElements = document.querySelectorAll('.label-content[contenteditable="true"]');
-          editableElements.forEach(el => {
-            if (!el.matches(':focus')) {
-              const labelId = el.getAttribute('data-label-id');
-              if (labelId) {
-                const [rowId, index] = labelId.split('-');
-                const label = this.labelData.find(l => String(l.rowId) === rowId);
-                if (label) {
-                  el.textContent = this.getLabelText(label);
-                }
-              }
-            }
-          });
-        });
       }
     },
     methods: {
@@ -386,29 +291,19 @@ ready(function() {
           }
         });
         const separator = this.showFieldNames ? '\n' : (this.separator || '\n');
-        const text = parts.join(separator);
-        // Store original text for comparison
-        if (!label.originalText) {
-          label.originalText = text;
-        }
-        return text;
-      },
-      storeOriginalText(label, event) {
-        if (label) {
-          label.originalText = event.target.innerText || event.target.textContent;
-        }
+        return parts.join(separator);
       },
       getFieldStyle(field) {
         return {
           marginBottom: this.separator ? '0' : '0.2em'
         };
       },
-      updateLabel,
       async save() {
         // Custom save handler to save only when user changed the value.
         await grist.widgetApi.setOption('template', this.template.id);
         await grist.widgetApi.setOption('blanks', this.blanks);
         await grist.widgetApi.setOption('fontSize', this.fontSize);
+        await grist.widgetApi.setOption('fontColor', this.fontColor);
         await grist.widgetApi.setOption('textAlign', this.textAlign);
         await grist.widgetApi.setOption('lineSpacing', this.lineSpacing);
         await grist.widgetApi.setOption('separator', this.separator);

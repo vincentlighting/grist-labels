@@ -1,16 +1,16 @@
 {
   "name": "@gristlabs/widget-editable-labels",
-  "description": "Editable printable label generator with multiple fields and formatting.",
+  "description": "Printable label generator with multiple fields and custom formatting.",
   "homePage": "https://github.com/gristlabs/grist-widget",
   "version": "0.0.1",
   "grist": {
-    "name": "Editable Print Labels",
+    "name": "Print Labels",
     "url": "index.html",
     "widgetId": "@gristlabs/widget-editable-labels",
     "published": false,
-    "accessLevel": "full",
+    "accessLevel": "read table",
     "renderAfterReady": true,
-    "description": "Create, edit, and print labels with multiple fields and custom formatting.",
+    "description": "Create and print labels with multiple fields and custom formatting options.",
     "authors": [
       {
         "name": "Grist Labs",
