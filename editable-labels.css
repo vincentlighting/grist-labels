@@ -27,6 +27,16 @@ body {
   outline: none;
   overflow: hidden;
 }
+.label-content-positioned {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0.08in;
+}
+.positioned-field {
+  position: absolute;
+  white-space: nowrap;
+}
 
 .field-name {
   font-weight: bold;
@@ -319,6 +329,63 @@ body {
   color: white;
   border-color: #4a90e2;
 }
+/* Editor Popup */
+.editor-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.editor-popup {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.editor-popup-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f5f5f5;
+}
+.editor-popup-header h3 {
+  margin: 0;
+  font-size: 16pt;
+  color: #333;
+}
+.editor-popup-content {
+  padding: 20px;
+  display: flex;
+  gap: 20px;
+  overflow: auto;
+  flex: 1;
+}
+.editor-label-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 300px;
+}
+.editor-label {
+  position: relative;
+  border: 2px dashed #ccc;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
 .label.editor-mode {
   position: relative;
   border: 2px dashed #ccc;
@@ -376,6 +443,16 @@ body {
   z-index: 1000;
   max-height: calc(100vh - 80px);
   overflow-y: auto;
+}
+.field-properties-panel-inline {
+  width: 280px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 .properties-header {
   padding: 12px;

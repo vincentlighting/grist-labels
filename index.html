@@ -75,29 +75,17 @@
           </div>
         </div>
       </div>
-      <template v-if="labelData">
+      <template v-if="labelData && !visualEditorMode">
         <div class="page-outer" v-for="(page, pageIndex) in arrangeLabels(labelData, template, blanks)">
           <div class="labelpage" :class="'page-' + template.id">
             <template v-for="(label, index) in page">
-              <div class="label" 
-                   :class="['label-' + template.id, { 'editor-mode': visualEditorMode }]" 
-                   v-if="label !== null">
-                <div v-if="visualEditorMode" 
-                     class="label-editor" 
-                     :data-label-id="label.rowId + '-' + index">
-                  <div v-for="(field, fieldIndex) in getVisibleFields(label)" 
+              <div class="label" :class="'label-' + template.id" v-if="label !== null">
+                <div v-if="hasPositionedFields(label)" class="label-content-positioned">
+                  <div v-for="field in label.fields" 
                        :key="field.columnId"
-                       class="field-editor-element"
-                       :style="getFieldPosition(field)"
-                       @mousedown="startDrag($event, field, label)"
-                       @click="selectField(field)"
-                       :class="{ selected: selectedField && selectedField.columnId === field.columnId }">
-                    <div class="field-content" :style="getFieldEditorStyle(field)">
-                      {{ formatField(field) }}
-                    </div>
-                    <div class="field-handle" v-if="selectedField && selectedField.columnId === field.columnId">
-                      <div class="field-handle-dot"></div>
-                    </div>
+                       class="positioned-field"
+                       :style="getPositionedFieldStyle(field)">
+                    {{ formatField(field) }}
                   </div>
                 </div>
                 <div v-else 
@@ -110,54 +98,85 @@
           </div>
         </div>
       </template>
-      <!-- Field Properties Panel -->
-      <div v-if="visualEditorMode && selectedField" class="field-properties-panel">
-        <div class="properties-header">
-          <span>Field: {{ selectedField.name }}</span>
-          <button @click="selectedField = null" class="close-btn">×</button>
-        </div>
-        <div class="properties-content">
-          <div class="property-group">
-            <label>Font Size:</label>
-            <input type="number" 
-                   v-model.number="selectedField.formatting.fontSize" 
-                   @change="saveFieldFormatting()"
-                   min="6" max="48" step="0.5">
+      <!-- Visual Editor Popup -->
+      <div v-if="visualEditorMode" class="editor-popup-overlay" @click="closeEditor()">
+        <div class="editor-popup" @click.stop>
+          <div class="editor-popup-header">
+            <h3>Label Designer</h3>
+            <button @click="closeEditor()" class="close-btn">×</button>
           </div>
-          <div class="property-group">
-            <label>Font Color:</label>
-            <input type="color" 
-                   v-model="selectedField.formatting.color" 
-                   @change="saveFieldFormatting()">
-          </div>
-          <div class="property-group">
-            <label>Alignment:</label>
-            <select v-model="selectedField.formatting.align" @change="saveFieldFormatting()">
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-          </div>
-          <div class="property-group">
-            <label>Font Weight:</label>
-            <select v-model="selectedField.formatting.fontWeight" @change="saveFieldFormatting()">
-              <option value="normal">Normal</option>
-              <option value="bold">Bold</option>
-            </select>
-          </div>
-          <div class="property-group">
-            <label>Position X (%):</label>
-            <input type="number" 
-                   v-model.number="selectedField.position.x" 
-                   @change="saveFieldFormatting()"
-                   min="0" max="100" step="0.1">
-          </div>
-          <div class="property-group">
-            <label>Position Y (%):</label>
-            <input type="number" 
-                   v-model.number="selectedField.position.y" 
-                   @change="saveFieldFormatting()"
-                   min="0" max="100" step="0.1">
+          <div class="editor-popup-content">
+            <div class="editor-label-container">
+              <div class="label editor-label" :class="'label-' + template.id">
+                <div class="label-editor">
+                  <div v-for="(field, fieldIndex) in getEditorFields()" 
+                       :key="field.columnId"
+                       class="field-editor-element"
+                       :style="getFieldPosition(field)"
+                       @mousedown="startDrag($event, field)"
+                       @click="selectField(field)"
+                       :class="{ selected: selectedField && selectedField.columnId === field.columnId }">
+                    <div class="field-content" :style="getFieldEditorStyle(field)">
+                      {{ field.name }}
+                    </div>
+                    <div class="field-handle" v-if="selectedField && selectedField.columnId === field.columnId">
+                      <div class="field-handle-dot"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Field Properties Panel -->
+            <div v-if="selectedField" class="field-properties-panel-inline">
+              <div class="properties-header">
+                <span>Field: {{ selectedField.name }}</span>
+                <button @click="selectedField = null" class="close-btn">×</button>
+              </div>
+              <div class="properties-content">
+                <div class="property-group">
+                  <label>Font Size:</label>
+                  <input type="number" 
+                         v-model.number="selectedField.formatting.fontSize" 
+                         @change="saveFieldFormatting()"
+                         min="6" max="48" step="0.5">
+                </div>
+                <div class="property-group">
+                  <label>Font Color:</label>
+                  <input type="color" 
+                         v-model="selectedField.formatting.color" 
+                         @change="saveFieldFormatting()">
+                </div>
+                <div class="property-group">
+                  <label>Alignment:</label>
+                  <select v-model="selectedField.formatting.align" @change="saveFieldFormatting()">
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                  </select>
+                </div>
+                <div class="property-group">
+                  <label>Font Weight:</label>
+                  <select v-model="selectedField.formatting.fontWeight" @change="saveFieldFormatting()">
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                  </select>
+                </div>
+                <div class="property-group">
+                  <label>Position X (%):</label>
+                  <input type="number" 
+                         v-model.number="selectedField.position.x" 
+                         @change="saveFieldFormatting()"
+                         min="0" max="100" step="0.1">
+                </div>
+                <div class="property-group">
+                  <label>Position Y (%):</label>
+                  <input type="number" 
+                         v-model.number="selectedField.position.y" 
+                         @change="saveFieldFormatting()"
+                         min="0" max="100" step="0.1">
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

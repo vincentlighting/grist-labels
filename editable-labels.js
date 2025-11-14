@@ -453,6 +453,36 @@ ready(function() {
           marginBottom: this.separator ? '0' : '0.2em'
         };
       },
+      hasPositionedFields(label) {
+        if (!label || !label.fields) return false;
+        // Check if any field has a custom position (not default stacked)
+        return label.fields.some(field => {
+          const colConfig = this.columnConfig.find(c => c.name === field.columnId);
+          if (!colConfig || !colConfig.position) return false;
+          // Consider it positioned if not at default stacked position
+          return colConfig.position.x !== 5 || colConfig.position.y > 20;
+        });
+      },
+      getPositionedFieldStyle(field) {
+        const colConfig = this.columnConfig.find(c => c.name === field.columnId);
+        const position = colConfig && colConfig.position ? colConfig.position : { x: 5, y: 5 };
+        const formatting = colConfig && colConfig.formatting ? colConfig.formatting : {
+          fontSize: this.fontSize || 11,
+          color: this.fontColor || '#000000',
+          align: 'left',
+          fontWeight: 'normal'
+        };
+        
+        return {
+          position: 'absolute',
+          left: position.x + '%',
+          top: position.y + '%',
+          fontSize: formatting.fontSize + 'pt',
+          color: formatting.color,
+          textAlign: formatting.align,
+          fontWeight: formatting.fontWeight
+        };
+      },
       async save() {
         // Custom save handler to save only when user changed the value.
         await grist.widgetApi.setOption('template', this.template.id);
@@ -470,7 +500,35 @@ ready(function() {
       toggleVisualEditor() {
         this.visualEditorMode = !this.visualEditorMode;
         this.selectedField = null;
+        if (this.visualEditorMode) {
+          this.save();
+        }
+      },
+      closeEditor() {
+        this.visualEditorMode = false;
+        this.selectedField = null;
         this.save();
+        // Update all labels with the new configuration
+        if (this.rows) {
+          updateRecords();
+        }
+      },
+      getEditorFields() {
+        // Return fields based on columnConfig for the editor (using column names as placeholders)
+        if (!this.columnConfig || this.columnConfig.length === 0) {
+          return [];
+        }
+        return this.columnConfig.map(col => ({
+          name: col.name,
+          columnId: col.name,
+          position: col.position || { x: 5, y: 5 },
+          formatting: col.formatting || {
+            fontSize: this.fontSize || 11,
+            color: this.fontColor || '#000000',
+            align: 'left',
+            fontWeight: 'normal'
+          }
+        }));
       },
       getVisibleFields(label) {
         if (!label || !label.fields) return [];
@@ -503,7 +561,7 @@ ready(function() {
         if (this.dragging) return;
         this.selectedField = field;
       },
-      startDrag(event, field, label) {
+      startDrag(event, field) {
         event.preventDefault();
         this.dragging = true;
         this.dragField = field;
@@ -515,8 +573,6 @@ ready(function() {
         if (!labelEl) return;
         
         const labelRect = labelEl.getBoundingClientRect();
-        const startX = ((event.clientX - labelRect.left) / labelRect.width) * 100;
-        const startY = ((event.clientY - labelRect.top) / labelRect.height) * 100;
         
         const onMouseMove = (e) => {
           if (!this.dragging || !this.dragField) return;
@@ -531,6 +587,11 @@ ready(function() {
           const colConfig = this.columnConfig.find(c => c.name === this.dragField.columnId);
           if (colConfig) {
             colConfig.position = { ...this.dragField.position };
+          }
+          
+          // Update selectedField if it's the same field
+          if (this.selectedField && this.selectedField.columnId === this.dragField.columnId) {
+            this.selectedField.position = { ...this.dragField.position };
           }
         };
         
@@ -553,7 +614,8 @@ ready(function() {
           colConfig.formatting = { ...this.selectedField.formatting };
           colConfig.position = { ...this.selectedField.position };
         }
-        // Update all labels with this field
+        this.save();
+        // Update all labels with this field configuration
         if (this.labelData) {
           this.labelData.forEach(label => {
             label.fields.forEach(field => {
@@ -564,7 +626,6 @@ ready(function() {
             });
           });
         }
-        this.save();
       }
     },
     updated: () => setTimeout(updateSize, 0),
