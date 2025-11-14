@@ -64,11 +64,20 @@ let data = {
   // Store original row indices for editing
   rowIndices: [],
   // Column configuration: visibility and order
-  columnConfig: []
+  columnConfig: [],
+  // Visual editor mode
+  visualEditorMode: false,
+  selectedField: null,
+  dragging: false,
+  dragStartPos: { x: 0, y: 0 },
+  dragField: null
 };
 
 // Columns we expect - now supports multiple fields
 const LabelCount = 'LabelCount';
+
+// Guard to prevent infinite loops
+let isUpdating = false;
 
 function arrangeLabels(labelData, template, blanks) {
   const pages = [];
@@ -133,6 +142,11 @@ function formatField(field) {
 }
 
 function updateRecords() {
+  // Prevent infinite loops
+  if (isUpdating) {
+    return;
+  }
+  isUpdating = true;
   try {
     data.status = '';
     const rows = data.rows;
@@ -162,31 +176,65 @@ function updateRecords() {
     const hasSavedConfig = data.columnConfig && Array.isArray(data.columnConfig) && data.columnConfig.length > 0;
     
     if (!hasSavedConfig) {
-      // First time: initialize with all columns visible
-      data.columnConfig = availableColumns.map(col => ({
+      // First time: initialize with all columns
+      // Calculate default positions (stacked vertically)
+      data.columnConfig = availableColumns.map((col, idx) => ({
         name: col,
-        visible: true
+        position: { x: 5, y: 5 + (idx * 15) }, // Default: left-aligned, stacked
+        formatting: {
+          fontSize: data.fontSize || 11,
+          color: data.fontColor || '#000000',
+          align: 'left',
+          fontWeight: 'normal'
+        }
       }));
     } else {
       // Ensure columnConfig is properly structured first
-      data.columnConfig = data.columnConfig.map(col => {
+      data.columnConfig = data.columnConfig.map((col, idx) => {
         if (typeof col === 'string') {
           // Handle case where config was saved as just strings
-          return { name: col, visible: true };
+          return { 
+            name: col, 
+            position: { x: 5, y: 5 + (idx * 15) },
+            formatting: {
+              fontSize: data.fontSize || 11,
+              color: data.fontColor || '#000000',
+              align: 'left',
+              fontWeight: 'normal'
+            }
+          };
         }
         return {
           name: col.name,
-          visible: col.visible !== undefined ? col.visible : true
+          position: col.position || { x: 5, y: 5 + (idx * 15) },
+          formatting: col.formatting || {
+            fontSize: data.fontSize || 11,
+            color: data.fontColor || '#000000',
+            align: 'left',
+            fontWeight: 'normal'
+          }
         };
       });
       
-      // Update: add new columns, remove deleted ones, preserve order and visibility
+      // Update: add new columns, remove deleted ones, preserve positions and formatting
       const existingNames = new Set(data.columnConfig.map(c => c.name));
       const newColumns = availableColumns.filter(col => !existingNames.has(col));
       
-      // Add new columns at the end (visible by default)
-      newColumns.forEach(col => {
-        data.columnConfig.push({ name: col, visible: true });
+      // Add new columns at the end
+      const lastY = data.columnConfig.length > 0 
+        ? Math.max(...data.columnConfig.map(c => c.position ? c.position.y : 0)) + 15
+        : 5;
+      newColumns.forEach((col, idx) => {
+        data.columnConfig.push({ 
+          name: col, 
+          position: { x: 5, y: lastY + (idx * 15) },
+          formatting: {
+            fontSize: data.fontSize || 11,
+            color: data.fontColor || '#000000',
+            align: 'left',
+            fontWeight: 'normal'
+          }
+        });
       });
       
       // Remove columns that no longer exist
@@ -198,19 +246,27 @@ function updateRecords() {
           // Already added above, but double-check
           const exists = data.columnConfig.some(c => c.name === col);
           if (!exists) {
-            data.columnConfig.push({ name: col, visible: true });
+            const idx = availableColumns.indexOf(col);
+            data.columnConfig.push({ 
+              name: col,
+              position: { x: 5, y: 5 + (idx * 15) },
+              formatting: {
+                fontSize: data.fontSize || 11,
+                color: data.fontColor || '#000000',
+                align: 'left',
+                fontWeight: 'normal'
+              }
+            });
           }
         }
       });
     }
     
-    // Get visible columns in configured order
-    const labelColumns = data.columnConfig
-      .filter(col => col.visible)
-      .map(col => col.name);
+    // Use all available columns (no filtering)
+    const labelColumns = availableColumns;
     
     if (labelColumns.length === 0) {
-      throw new Error(`Please enable at least one column in the Column Management section.`);
+      throw new Error(`No columns available. Please ensure your table has data columns.`);
     }
     
     // Store column metadata
@@ -241,12 +297,27 @@ function updateRecords() {
             }
           }
           
+          // Get column config for this field
+          const colConfig = data.columnConfig.find(c => c.name === colName);
+          
           return {
             name: colName,
             value: value,
             type: fieldType,
             columnId: colName,
-            rowId: r.id
+            rowId: r.id,
+            position: colConfig ? (colConfig.position || { x: 5, y: 5 }) : { x: 5, y: 5 },
+            formatting: colConfig ? (colConfig.formatting || {
+              fontSize: data.fontSize || 11,
+              color: data.fontColor || '#000000',
+              align: 'left',
+              fontWeight: 'normal'
+            }) : {
+              fontSize: data.fontSize || 11,
+              color: data.fontColor || '#000000',
+              align: 'left',
+              fontWeight: 'normal'
+            }
           };
         });
         
@@ -267,6 +338,8 @@ function updateRecords() {
     handleError(err);
     // Ensure we don't have invalid data
     data.labelData = null;
+  } finally {
+    isUpdating = false;
   }
 }
 
@@ -312,6 +385,8 @@ ready(function() {
       if (options.columnConfig && Array.isArray(options.columnConfig) && options.columnConfig.length > 0) {
         data.columnConfig = options.columnConfig;
       }
+      // Load visual editor mode
+      data.visualEditorMode = options.visualEditorMode || false;
     } else {
       // Revert to defaults.
       data.template = defaultTemplate;
@@ -323,11 +398,10 @@ ready(function() {
       data.separator = ', ';
       data.showFieldNames = false;
       data.columnConfig = [];
+      data.visualEditorMode = false;
     }
-    // If we have rows, update records to apply column config
-    if (data.rows) {
-      updateRecords();
-    }
+    // Don't call updateRecords here - let the rows watch handle it
+    // This prevents infinite loops
   })
   
   // Update the widget anytime the document data changes.
@@ -379,27 +453,6 @@ ready(function() {
           marginBottom: this.separator ? '0' : '0.2em'
         };
       },
-      onColumnVisibilityChange() {
-        // Save configuration and update labels
-        this.save().then(() => {
-          if (this.rows) {
-            updateRecords();
-          }
-        });
-      },
-      moveColumn(index, direction) {
-        const newIndex = index + direction;
-        if (newIndex >= 0 && newIndex < this.columnConfig.length) {
-          const item = this.columnConfig.splice(index, 1)[0];
-          this.columnConfig.splice(newIndex, 0, item);
-          this.save().then(() => {
-            // Trigger update to refresh labels after save
-            if (this.rows) {
-              updateRecords();
-            }
-          });
-        }
-      },
       async save() {
         // Custom save handler to save only when user changed the value.
         await grist.widgetApi.setOption('template', this.template.id);
@@ -411,6 +464,107 @@ ready(function() {
         await grist.widgetApi.setOption('separator', this.separator);
         await grist.widgetApi.setOption('showFieldNames', this.showFieldNames);
         await grist.widgetApi.setOption('columnConfig', this.columnConfig);
+        await grist.widgetApi.setOption('visualEditorMode', this.visualEditorMode);
+      },
+      // Visual editor methods
+      toggleVisualEditor() {
+        this.visualEditorMode = !this.visualEditorMode;
+        this.selectedField = null;
+        this.save();
+      },
+      getVisibleFields(label) {
+        if (!label || !label.fields) return [];
+        // Return all fields - filtering happens in the visual editor by positioning
+        return label.fields;
+      },
+      getFieldPosition(field) {
+        if (!field.position) return { left: '5%', top: '5%' };
+        return {
+          left: field.position.x + '%',
+          top: field.position.y + '%'
+        };
+      },
+      getFieldEditorStyle(field) {
+        if (!field.formatting) {
+          return {
+            fontSize: this.fontSize + 'pt',
+            color: this.fontColor,
+            textAlign: this.textAlign
+          };
+        }
+        return {
+          fontSize: field.formatting.fontSize + 'pt',
+          color: field.formatting.color || this.fontColor,
+          textAlign: field.formatting.align || 'left',
+          fontWeight: field.formatting.fontWeight || 'normal'
+        };
+      },
+      selectField(field) {
+        if (this.dragging) return;
+        this.selectedField = field;
+      },
+      startDrag(event, field, label) {
+        event.preventDefault();
+        this.dragging = true;
+        this.dragField = field;
+        this.dragStartPos = {
+          x: event.clientX,
+          y: event.clientY
+        };
+        const labelEl = event.target.closest('.label');
+        if (!labelEl) return;
+        
+        const labelRect = labelEl.getBoundingClientRect();
+        const startX = ((event.clientX - labelRect.left) / labelRect.width) * 100;
+        const startY = ((event.clientY - labelRect.top) / labelRect.height) * 100;
+        
+        const onMouseMove = (e) => {
+          if (!this.dragging || !this.dragField) return;
+          const newX = ((e.clientX - labelRect.left) / labelRect.width) * 100;
+          const newY = ((e.clientY - labelRect.top) / labelRect.height) * 100;
+          
+          // Update position
+          this.dragField.position.x = Math.max(0, Math.min(100, newX));
+          this.dragField.position.y = Math.max(0, Math.min(100, newY));
+          
+          // Update columnConfig
+          const colConfig = this.columnConfig.find(c => c.name === this.dragField.columnId);
+          if (colConfig) {
+            colConfig.position = { ...this.dragField.position };
+          }
+        };
+        
+        const onMouseUp = () => {
+          this.dragging = false;
+          this.dragField = null;
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          this.save();
+        };
+        
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      },
+      saveFieldFormatting() {
+        if (!this.selectedField) return;
+        // Update columnConfig with field's formatting and position
+        const colConfig = this.columnConfig.find(c => c.name === this.selectedField.columnId);
+        if (colConfig) {
+          colConfig.formatting = { ...this.selectedField.formatting };
+          colConfig.position = { ...this.selectedField.position };
+        }
+        // Update all labels with this field
+        if (this.labelData) {
+          this.labelData.forEach(label => {
+            label.fields.forEach(field => {
+              if (field.columnId === this.selectedField.columnId) {
+                field.formatting = { ...this.selectedField.formatting };
+                field.position = { ...this.selectedField.position };
+              }
+            });
+          });
+        }
+        this.save();
       }
     },
     updated: () => setTimeout(updateSize, 0),
