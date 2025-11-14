@@ -25,9 +25,13 @@ An enhanced Grist widget for creating and printing labels with multiple fields a
 
 ### Setting Up Columns
 
-1. In the Grist Creator Panel for this widget, select which columns you want to display on labels
-2. Optionally add a "Label count" column (numeric) to specify how many labels to print per row
-3. The widget will automatically use all selected columns (except "Label count") as label fields
+1. **Column Management**: Click the ⚙ button in the widget header to open the options panel
+2. Scroll down to the **"Column Management"** section
+3. **Show/Hide columns**: Check or uncheck the boxes next to column names to control visibility
+4. **Reorder columns**: Use the ↑ and ↓ buttons to change the order columns appear on labels
+5. Optionally add a "Label count" column (numeric) to specify how many labels to print per row
+
+**Note**: The widget automatically detects all available columns from your table (excluding system columns like `id` and `manualSort`). You can control which ones appear and in what order using the Column Management section.
 
 ### Formatting Options
 
@@ -40,6 +44,10 @@ Click the ⚙ button in the header to access formatting options:
 - **Line spacing**: Adjust line height (1.0-3.0)
 - **Field separator**: Custom separator between fields (e.g., ", ", " | ", etc.)
 - **Show field names**: Toggle to display column names on labels
+- **Column Management**: 
+  - Check/uncheck columns to show or hide them on labels
+  - Use ↑ and ↓ buttons to reorder columns
+  - Changes are saved automatically
 
 ### Label Templates
 

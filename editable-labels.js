@@ -62,7 +62,9 @@ let data = {
   // Column mappings - will be populated from Grist
   columnMappings: {},
   // Store original row indices for editing
-  rowIndices: []
+  rowIndices: [],
+  // Column configuration: visibility and order
+  columnConfig: []
 };
 
 // Columns we expect - now supports multiple fields
@@ -133,18 +135,51 @@ function updateRecords() {
       throw new Error("No data. Please add some rows");
     }
     
-    // Get all columns except LabelCount and id
-    // The mapped rows will have column names as keys
+    // Get columns from the mapped rows
+    // When columns are selected in Creator Panel, grist.mapColumnNames() returns only selected columns
+    // Otherwise, it returns all columns (we'll filter out system columns)
     const allColumns = Object.keys(rows[0]);
-    const labelColumns = allColumns.filter(col => 
+    
+    // Filter out system columns and LabelCount
+    const availableColumns = allColumns.filter(col => 
       col !== LabelCount && 
       col !== 'id' && 
       col !== 'manualSort' &&
       !col.startsWith('_')
     );
     
+    if (availableColumns.length === 0) {
+      throw new Error(`Please select columns to display on labels. In the Creator Panel, click "Select by" and choose which columns to include.`);
+    }
+    
+    // Initialize or update column configuration
+    if (data.columnConfig.length === 0) {
+      // First time: initialize with all columns visible
+      data.columnConfig = availableColumns.map(col => ({
+        name: col,
+        visible: true
+      }));
+    } else {
+      // Update: add new columns, remove deleted ones, preserve order
+      const existingNames = new Set(data.columnConfig.map(c => c.name));
+      const newColumns = availableColumns.filter(col => !existingNames.has(col));
+      
+      // Add new columns at the end
+      newColumns.forEach(col => {
+        data.columnConfig.push({ name: col, visible: true });
+      });
+      
+      // Remove columns that no longer exist
+      data.columnConfig = data.columnConfig.filter(c => availableColumns.includes(c.name));
+    }
+    
+    // Get visible columns in configured order
+    const labelColumns = data.columnConfig
+      .filter(col => col.visible)
+      .map(col => col.name);
+    
     if (labelColumns.length === 0) {
-      throw new Error(`Please select columns to display in the Creator Panel. Click the widget settings and choose which columns to include.`);
+      throw new Error(`Please enable at least one column in the Column Management section.`);
     }
     
     // Store column metadata
@@ -236,6 +271,10 @@ ready(function() {
       data.lineSpacing = options.lineSpacing || 1.2;
       data.separator = options.separator || ', ';
       data.showFieldNames = options.showFieldNames || false;
+      // Load column configuration if saved
+      if (options.columnConfig && Array.isArray(options.columnConfig)) {
+        data.columnConfig = options.columnConfig;
+      }
     } else {
       // Revert to defaults.
       data.template = defaultTemplate;
@@ -246,6 +285,7 @@ ready(function() {
       data.lineSpacing = 1.2;
       data.separator = ', ';
       data.showFieldNames = false;
+      data.columnConfig = [];
     }
   })
   
@@ -275,6 +315,15 @@ ready(function() {
     watch : {
       rows() {
         updateRecords();
+      },
+      columnConfig: {
+        handler() {
+          // Update labels when column configuration changes
+          if (this.rows) {
+            updateRecords();
+          }
+        },
+        deep: true
       }
     },
     methods: {
@@ -298,6 +347,18 @@ ready(function() {
           marginBottom: this.separator ? '0' : '0.2em'
         };
       },
+      moveColumn(index, direction) {
+        const newIndex = index + direction;
+        if (newIndex >= 0 && newIndex < this.columnConfig.length) {
+          const item = this.columnConfig.splice(index, 1)[0];
+          this.columnConfig.splice(newIndex, 0, item);
+          this.save();
+          // Trigger update to refresh labels
+          if (this.rows) {
+            updateRecords();
+          }
+        }
+      },
       async save() {
         // Custom save handler to save only when user changed the value.
         await grist.widgetApi.setOption('template', this.template.id);
@@ -308,6 +369,7 @@ ready(function() {
         await grist.widgetApi.setOption('lineSpacing', this.lineSpacing);
         await grist.widgetApi.setOption('separator', this.separator);
         await grist.widgetApi.setOption('showFieldNames', this.showFieldNames);
+        await grist.widgetApi.setOption('columnConfig', this.columnConfig);
       }
     },
     updated: () => setTimeout(updateSize, 0),

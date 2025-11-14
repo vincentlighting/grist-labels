@@ -64,6 +64,31 @@
             <label>Show field names:</label>
             <input type="checkbox" id="showfieldnames" v-model="showFieldNames" @change="save()">
           </div>
+          <div class="option-section">
+            <div class="option-section-header">Column Management</div>
+            <div class="column-list">
+              <div v-for="(col, index) in columnConfig" :key="col.name" class="column-item">
+                <input type="checkbox" 
+                       :id="'col-' + index" 
+                       v-model="col.visible" 
+                       @change="save()"
+                       class="column-checkbox">
+                <label :for="'col-' + index" class="column-label">{{ col.name }}</label>
+                <div class="column-controls">
+                  <button type="button" 
+                          @click="moveColumn(index, -1)" 
+                          :disabled="index === 0"
+                          class="column-btn" 
+                          title="Move up">↑</button>
+                  <button type="button" 
+                          @click="moveColumn(index, 1)" 
+                          :disabled="index === columnConfig.length - 1"
+                          class="column-btn" 
+                          title="Move down">↓</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <template v-if="labelData">
